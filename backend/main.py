@@ -146,7 +146,7 @@ app = FastAPI(title="SQL Query Optimizer", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://sql-query-optimizer-znbg.vercel.app/"
+        "https://sql-query-optimizer-ylqi.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
