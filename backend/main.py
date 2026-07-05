@@ -512,4 +512,8 @@ if __name__ == "__main__":
 
     print("📊 Stats: GET http://localhost:8000/stats\n")
 
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(
+    app,
+    host="0.0.0.0",
+    port=int(os.environ.get("PORT", 8001))
+)
