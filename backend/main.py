@@ -144,17 +144,13 @@ app = FastAPI(title="SQL Query Optimizer", version="1.0.0")
 # CORS
 
 app.add_middleware(
-
     CORSMiddleware,
-
-    allow_origins=["*"],
-
+    allow_origins=[
+        "https://YOUR-VERCEL-APP.vercel.app"
+    ],
     allow_credentials=True,
-
     allow_methods=["*"],
-
     allow_headers=["*"],
-
 )
 
 
