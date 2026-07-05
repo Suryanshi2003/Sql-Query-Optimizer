@@ -78,7 +78,7 @@ export class SqlOptimizerService {
 
     // ✅ CRITICAL: Make sure this URL is correct
 
-    private apiUrl = 'http://localhost:8001';
+    private apiUrl = 'https://sql-query-optimizer-3.onrender.com';
 
 
 
