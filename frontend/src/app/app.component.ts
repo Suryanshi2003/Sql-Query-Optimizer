@@ -146,7 +146,7 @@ export class AppComponent implements OnInit {
 
                 this.backendConnected = false;
 
-                this.error = '⚠️ Cannot connect to backend. Make sure backend is running on http://localhost:8001';
+                this.error = 'Cannot connect to backend. Make sure backend is running.';
 
             }
 
@@ -172,7 +172,7 @@ export class AppComponent implements OnInit {
 
         if (!this.backendConnected) {
 
-            this.error = '⚠️ Backend is not connected. Please start the backend server.';
+            this.error = ' Backend is not connected. Please start the backend server.';
 
             return;
 
