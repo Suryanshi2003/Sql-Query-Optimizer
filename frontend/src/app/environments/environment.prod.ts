@@ -2,6 +2,6 @@ export const environment = {
 
     production: true,
 
-    apiUrl: 'https://sql-optimizer-prod.railway.app'
+    apiUrl: ' https://sql-query-optimizer-3.onrender.com'
 
 };
