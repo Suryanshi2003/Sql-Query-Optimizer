@@ -1,0 +1,196 @@
+<!-- Header -->
+<header class="header">
+    <div class="container">
+        <div class="logo">
+            <h1>⚡ SQL Query Optimizer</h1>
+            <p>AI-powered query optimization using Groq API (FREE)</p>
+        </div>
+        <div class="stats-display" *ngIf="stats">
+            <div class="stat">
+                <span class="stat-value">{{ stats.total_queries_analyzed }}</span>
+                <span class="stat-label">Queries Analyzed</span>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- Main Container -->
+<div class="container">
+    <div class="layout">
+        <!-- Main Section -->
+        <div class="main-section">
+            <!-- Tabs -->
+            <div class="tabs">
+                <button
+                        class="tab"
+                        [class.active]="activeTab === 'input'"
+                        (click)="activeTab = 'input'"
+                >
+                    📝 Original Query
+                </button>
+                <button
+                        *ngIf="optimizedQuery"
+                        class="tab"
+                        [class.active]="activeTab === 'output'"
+                        (click)="activeTab = 'output'"
+                >
+                    ✨ Optimized Query
+                </button>
+            </div>
+
+            <!-- Input Tab -->
+            <div *ngIf="activeTab === 'input'" class="editor-section">
+                <!-- Controls -->
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="db-type">Database Type</label>
+                        <select
+                                id="db-type"
+                                [(ngModel)]="databaseType"
+                                class="select-control"
+                        >
+                            <option value="postgres">PostgreSQL</option>
+                            <option value="mysql">MySQL</option>
+                            <option value="bigquery">BigQuery</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group full-width">
+                        <label for="context">
+                            Context (Optional - table schema, relationships, etc.)
+                        </label>
+                        <textarea
+                                id="context"
+                                [(ngModel)]="context"
+                                placeholder="e.g., users table has id, name, email, age columns..."
+                                rows="2"
+                                class="textarea-control"
+                        ></textarea>
+                    </div>
+                </div>
+
+                <!-- Editor -->
+                <div class="editor-wrapper">
+          <textarea
+                  class="code-editor"
+                  [(ngModel)]="originalQuery"
+                  placeholder="Paste your SQL query here..."
+                  [style.height]="sqlEditorHeight"
+          ></textarea>
+                </div>
+
+                <!-- Error Message -->
+                <div *ngIf="error" class="error-message">
+                    <span>❌ {{ error }}</span>
+                </div>
+
+                <!-- Optimize Button -->
+                <button
+                        class="btn btn-primary"
+                        (click)="optimizeQuery()"
+                        [disabled]="loading"
+                >
+                    {{ loading ? '🔄 Analyzing...' : '⚡ Optimize Query' }}
+                </button>
+            </div>
+
+            <!-- Output Tab -->
+            <div *ngIf="activeTab === 'output' && optimizedQuery" class="editor-section">
+                <!-- Improvement Badge -->
+                <div *ngIf="improvement" class="improvement-badge" [ngClass]="getImprovementClass()">
+                    <span class="improvement-value">{{ improvement }}</span>
+                    <span class="improvement-text">Estimated Improvement</span>
+                </div>
+
+                <!-- Explanation -->
+                <div *ngIf="explanation" class="explanation">
+                    <h3>💡 What Changed?</h3>
+                    <p>{{ explanation }}</p>
+                </div>
+
+                <!-- Optimized Query -->
+                <div class="editor-label">
+                    <h3>Optimized Query</h3>
+                    <button
+                            class="btn btn-small"
+                            (click)="copyToClipboard(optimizedQuery)"
+                    >
+                        📋 Copy
+                    </button>
+                </div>
+                <div class="editor-wrapper">
+          <textarea
+                  class="code-editor"
+                  [value]="optimizedQuery"
+                  readonly
+                  [style.height]="'300px'"
+          ></textarea>
+                </div>
+
+                <!-- Tips -->
+                <div *ngIf="tips.length > 0" class="tips-section">
+                    <h3>🎯 Optimization Tips</h3>
+                    <ul class="tips-list">
+                        <li *ngFor="let tip of tips; let i = index">
+                            <span class="tip-number">{{ i + 1 }}</span>
+                            <span>{{ tip }}</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <button
+                        class="btn btn-secondary"
+                        (click)="activeTab = 'input'"
+                >
+                    ← Back to Editor
+                </button>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <!-- History -->
+            <div class="sidebar-section">
+                <h3>📜 Recent Optimizations</h3>
+                <div *ngIf="history.length > 0; else emptyHistory" class="history-list">
+                    <div
+                            *ngFor="let item of history | slice:0:5"
+                            class="history-item"
+                            (click)="loadFromHistory(item)"
+                    >
+                        <div class="history-db">{{ item.database_type }}</div>
+                        <div class="history-preview">
+                            {{ truncate(item.original_query, 40) }}
+                        </div>
+                        <div *ngIf="item.estimated_improvement" class="history-improvement">
+                            +{{ item.estimated_improvement }}
+                        </div>
+                    </div>
+                </div>
+                <ng-template #emptyHistory>
+                    <p class="empty-state">No history yet</p>
+                </ng-template>
+            </div>
+
+            <!-- Tips Section -->
+            <div class="sidebar-section">
+                <h3>📚 Optimization Tips</h3>
+                <ul class="quick-tips">
+                    <li>✓ Add indexes on frequently filtered columns</li>
+                    <li>✓ Avoid SELECT * when possible</li>
+                    <li>✓ Use JOINs instead of subqueries</li>
+                    <li>✓ Consider window functions for aggregations</li>
+                    <li>✓ Analyze EXPLAIN plans</li>
+                </ul>
+            </div>
+
+            <!-- Info -->
+            <div class="sidebar-section">
+                <h3>ℹ️ About</h3>
+                <p>SQL Query Optimizer uses Groq AI to analyze and improve your queries.</p>
+                <p>✨ <strong>Completely FREE</strong> - 9,000 requests/day</p>
+                <p>Supports: PostgreSQL, MySQL, BigQuery</p>
+            </div>
+        </aside>
+    </div>
+</div>
