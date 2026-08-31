@@ -56,7 +56,7 @@ interface QueryHistoryItem {
 
     styleUrls: ['./app.component.css'],
 
-    providers: [SqlOptimizerService]  // ✅ Add service provider here
+    providers: [SqlOptimizerService]  //  Add service provider here
 
 })
 
@@ -122,7 +122,7 @@ export class AppComponent implements OnInit {
 
 
 
-    // ✅ Check if backend is running
+    //  Check if backend is running
 
     checkBackendConnection(): void {
 
@@ -156,7 +156,7 @@ export class AppComponent implements OnInit {
 
 
 
-    // ✅ Fixed: Line 109 - optimizeQuery method with better error handling
+    //  - optimizeQuery method with better error handling
 
     optimizeQuery(): void {
 
@@ -202,7 +202,7 @@ export class AppComponent implements OnInit {
 
 
 
-        // ✅ LINE 109 - This is where the API call happens
+        // LINE - This is where the API call happens
 
         this.sqlOptimizerService
 
@@ -250,27 +250,27 @@ export class AppComponent implements OnInit {
 
 
 
-                    // ✅ Better error messages
+                    // Better error messages
 
                     if (err.status === 0) {
 
-                        this.error = '❌ CORS Error or Backend Not Running. Check console for details.';
+                        this.error = ' CORS Error or Backend Not Running. Check console for details.';
 
                     } else if (err.status === 404) {
 
-                        this.error = '❌ Backend endpoint not found (404). Is backend running?';
+                        this.error = ' Backend endpoint not found (404). Is backend running?';
 
                     } else if (err.status === 500) {
 
-                        this.error = `❌ Backend Error: ${err.error?.detail || 'Internal server error'}`;
+                        this.error = ` Backend Error: ${err.error?.detail || 'Internal server error'}`;
 
                     } else if (err.error?.detail) {
 
-                        this.error = `❌ Error: ${err.error.detail}`;
+                        this.error = ` Error: ${err.error.detail}`;
 
                     } else {
 
-                        this.error = `❌ Failed to optimize query: ${err.message || 'Unknown error'}`;
+                        this.error = `Failed to optimize query: ${err.message || 'Unknown error'}`;
 
                     }
 
@@ -372,13 +372,13 @@ export class AppComponent implements OnInit {
 
         navigator.clipboard.writeText(text).then(() => {
 
-            alert('✅ Copied to clipboard!');
+            alert(' Copied to clipboard!');
 
         }).catch(err => {
 
             console.error('Failed to copy:', err);
 
-            alert('❌ Failed to copy to clipboard');
+            alert(' Failed to copy to clipboard');
 
         });
 
