@@ -228,17 +228,23 @@ Return ONLY this JSON format (no markdown):
 
     except json.JSONDecodeError:
 
-        raise HTTPException(status_code=400, detail="Failed to parse Groq response")
+        raise HTTPException(
+        status_code=502,
+        detail="The AI service returned an invalid response. Please try again."
+    )
 
     except Exception as e:
 
-        raise HTTPException(status_code=500, detail=f"Groq API error: {str(e)}")
+        raise HTTPException(
+        status_code=500,
+        detail="AI service is temporarily unavailable. Please try again later."
+    )
 
 
 
 # ============================================================================
 
-# ✅ ENDPOINT 1: GET /
+# ENDPOINT 1: GET /
 
 # ============================================================================
 
@@ -262,7 +268,7 @@ async def root():
 
 # ============================================================================
 
-# ✅ ENDPOINT 2: OPTIONS / (CORS Preflight)
+#  ENDPOINT 2: OPTIONS / (CORS Preflight)
 
 # ============================================================================
 
@@ -278,7 +284,7 @@ async def preflight_handler(full_path: str):
 
 # ============================================================================
 
-# ✅ ENDPOINT 3: GET /health
+#  ENDPOINT 3: GET /health
 
 # ============================================================================
 
@@ -314,7 +320,7 @@ async def health_check():
 
 # ============================================================================
 
-# ✅ ENDPOINT 4: POST /optimize (MAIN ENDPOINT - THE IMPORTANT ONE!)
+#  ENDPOINT 4: POST /optimize (MAIN ENDPOINT - THE IMPORTANT ONE!)
 
 # ============================================================================
 
@@ -400,7 +406,7 @@ async def optimize_query(request: OptimizeQueryRequest):
 
 # ============================================================================
 
-# ✅ ENDPOINT 5: GET /history
+#  ENDPOINT 5: GET /history
 
 # ============================================================================
 
@@ -450,7 +456,7 @@ async def get_history(limit: int = 20):
 
 # ============================================================================
 
-# ✅ ENDPOINT 6: GET /stats
+#  ENDPOINT 6: GET /stats
 
 # ============================================================================
 
@@ -498,15 +504,15 @@ if __name__ == "__main__":
 
     import uvicorn
 
-    print("📝 API Docs: http://localhost:8000/docs")
+    print(" API Docs: http://localhost:8000/docs")
 
-    print("🧪 Health: http://localhost:8000/health")
+    print(" Health: http://localhost:8000/health")
 
-    print("⚡ Optimize: POST http://localhost:8000/optimize")
+    print(" Optimize: POST http://localhost:8000/optimize")
 
-    print("📜 History: GET http://localhost:8000/history")
+    print(" History: GET http://localhost:8000/history")
 
-    print("📊 Stats: GET http://localhost:8000/stats\n")
+    print(" Stats: GET http://localhost:8000/stats\n")
 
     uvicorn.run(
     app,
