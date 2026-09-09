@@ -6,6 +6,7 @@ import { Observable, throwError } from 'rxjs';
 
 import { catchError } from 'rxjs/operators';
 
+import { environment } from '../environments/environment';
 
 
 export interface OptimizeRequest {
@@ -76,9 +77,9 @@ export interface StatsResponse {
 
 export class SqlOptimizerService {
 
-    // ✅ CRITICAL: Make sure this URL is correct
+    //  CRITICAL: Make sure this URL is correct
 
-    private apiUrl = 'https://sql-query-optimizer-3.onrender.com';
+    private apiUrl = environment.apiUrl;
 
 
 

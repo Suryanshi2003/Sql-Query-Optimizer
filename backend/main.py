@@ -1,28 +1,20 @@
 """
-
 SQL Query Optimizer - Backend
 
-FastAPI with Groq AI for SQL optimization
-
+FastAPI + Groq AI + Redis Caching + SQLAlchemy
 """
 
-
-
 from fastapi import FastAPI, HTTPException
-
 from fastapi.middleware.cors import CORSMiddleware
-
 from pydantic import BaseModel
-
 from datetime import datetime
 
 import os
+import json
+import hashlib
 
 from dotenv import load_dotenv
-
 from groq import Groq
-
-import json
 
 from sqlalchemy import (
     create_engine,
@@ -36,64 +28,153 @@ from sqlalchemy import (
 )
 
 from sqlalchemy.ext.declarative import declarative_base
-
 from sqlalchemy.orm import sessionmaker
 
+import redis
 
 
-
+# ============================================================================
+# LOAD ENVIRONMENT VARIABLES
+# ============================================================================
 
 load_dotenv()
 
 
-
-print("\n" + "="*60)
-
-print("🚀 SQL Query Optimizer Backend Starting")
-
-print("="*60 + "\n")
+print(" SQL Query Optimizer Backend Starting")
 
 
 
+# ============================================================================
 # DATABASE
+# ============================================================================
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./sql_optimizer.db")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "sqlite:///./sql_optimizer.db"
+)
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={
+        "check_same_thread": False
+    } if "sqlite" in DATABASE_URL else {}
+)
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine
+)
 
 Base = declarative_base()
-
 
 
 class QueryHistory(Base):
 
     __tablename__ = "query_history"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
 
-    original_query = Column(Text, nullable=False)
+    original_query = Column(
+        Text,
+        nullable=False
+    )
 
-    optimized_query = Column(Text, nullable=False)
+    optimized_query = Column(
+        Text,
+        nullable=False
+    )
 
-    database_type = Column(String(50), nullable=False)
+    database_type = Column(
+        String(50),
+        nullable=False
+    )
 
-    optimization_tips = Column(Text, nullable=False)
+    optimization_tips = Column(
+        Text,
+        nullable=False
+    )
 
-    estimated_improvement = Column(String(20), nullable=True)
+    estimated_improvement = Column(
+        String(20),
+        nullable=True
+    )
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
 
-    user_id = Column(String(100), default="anonymous")
-
+    user_id = Column(
+        String(100),
+        default="anonymous"
+    )
 
 
 Base.metadata.create_all(bind=engine)
 
+# ============================================================================
+# REDIS
+# ============================================================================
+
+REDIS_URL = os.getenv("REDIS_URL")
+
+redis_client = None
+
+if REDIS_URL:
+
+    try:
+
+        redis_client = redis.from_url(
+            REDIS_URL,
+            decode_responses=True
+        )
+
+        redis_client.ping()
+
+        print(" Redis connected successfully")
+
+    except Exception as e:
+
+        print(f" Redis connection failed: {e}")
+
+        redis_client = None
+
+else:
+
+    print(" REDIS_URL not configured")
+    print(" Redis caching will be disabled")
 
 
-# MODELS
+# ============================================================================
+# REDIS CACHE KEY
+# ============================================================================
+
+def generate_cache_key(
+        query: str,
+        database_type: str,
+        context: str
+) -> str:
+
+    data = (
+        f"{database_type}:"
+        f"{context}:"
+        f"{query}"
+    )
+
+    hash_value = hashlib.sha256(
+        data.encode("utf-8")
+    ).hexdigest()
+
+    return f"sql_optimizer:{hash_value}"
+
+# ============================================================================
+# PYDANTIC MODELS
+# ============================================================================
 
 class OptimizeQueryRequest(BaseModel):
 
@@ -102,7 +183,6 @@ class OptimizeQueryRequest(BaseModel):
     database_type: str
 
     context: str = ""
-
 
 
 class OptimizationResponse(BaseModel):
@@ -117,6 +197,7 @@ class OptimizationResponse(BaseModel):
 
     explanation: str
 
+    cached: bool = False
 
 
 class QueryHistoryResponse(BaseModel):
@@ -134,30 +215,45 @@ class QueryHistoryResponse(BaseModel):
     estimated_improvement: str
 
 
+# ============================================================================
+# FASTAPI APP
+# ============================================================================
 
-# APP
+app = FastAPI(
+    title="SQL Query Optimizer",
+    version="1.0.0"
+)
 
-app = FastAPI(title="SQL Query Optimizer", version="1.0.0")
 
-
-
+# ============================================================================
 # CORS
+# ============================================================================
 
 app.add_middleware(
     CORSMiddleware,
+
     allow_origins=[
         "https://sql-query-optimizer-ylqi.vercel.app",
+        "http://localhost:4200",
     ],
+
     allow_credentials=True,
+
     allow_methods=["*"],
+
     allow_headers=["*"],
 )
 
 
+# ============================================================================
+# GROQ CLIENT
+# ============================================================================
 
-# GROQ
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+client = Groq(
+    api_key=GROQ_API_KEY
+)
 
 
 
@@ -243,16 +339,11 @@ Return ONLY this JSON format (no markdown):
 
 
 # ============================================================================
-
 # ENDPOINT 1: GET /
-
 # ============================================================================
 
 @app.get("/")
-
 async def root():
-
-    """Root endpoint - API is running"""
 
     return {
 
@@ -265,42 +356,58 @@ async def root():
     }
 
 
-
 # ============================================================================
-
-#  ENDPOINT 2: OPTIONS / (CORS Preflight)
-
+# ENDPOINT 2: OPTIONS / (CORS PREFLIGHT)
 # ============================================================================
 
 @app.options("/{full_path:path}")
+async def preflight_handler(
+        full_path: str
+):
 
-async def preflight_handler(full_path: str):
-
-    """Handle CORS preflight requests - REQUIRED FOR CORS"""
-
-    return {"detail": "OK"}
-
+    return {
+        "detail": "OK"
+    }
 
 
 # ============================================================================
-
-#  ENDPOINT 3: GET /health
-
+# ENDPOINT 3: GET /health
 # ============================================================================
 
 @app.get("/health")
-
 async def health_check():
-
-    """Health check - verify backend is running"""
 
     try:
 
+        # Check database
         db = SessionLocal()
+
         try:
-            db.execute(text("SELECT 1"))
+
+            db.execute(
+                text("SELECT 1")
+            )
+
         finally:
+
             db.close()
+
+
+        # Check Redis
+        redis_status = "not configured"
+
+        if redis_client:
+
+            try:
+
+                redis_client.ping()
+
+                redis_status = "connected"
+
+            except Exception:
+
+                redis_status = "disconnected"
+
 
         return {
 
@@ -308,43 +415,68 @@ async def health_check():
 
             "database": "connected",
 
-            "message": "Backend is running successfully"
+            "redis": redis_status,
+
+            "message": (
+                "Backend is running successfully"
+            )
 
         }
 
     except Exception as e:
 
-        raise HTTPException(status_code=503, detail=f"Database error: {str(e)}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Database error: {str(e)}"
+        )
 
 
 
 # ============================================================================
-
-#  ENDPOINT 4: POST /optimize (MAIN ENDPOINT - THE IMPORTANT ONE!)
-
+# ENDPOINT 4: POST /optimize
 # ============================================================================
 
 @app.post("/optimize")
+async def optimize_query(
+        request: OptimizeQueryRequest
+):
 
-async def optimize_query(request: OptimizeQueryRequest):
+    # ------------------------------------------------------------------------
+    # VALIDATION
+    # ------------------------------------------------------------------------
 
-    """Main endpoint - Optimize SQL query using Groq AI"""
+    if (
+            not request.query
+            or len(request.query.strip()) < 10
+    ):
 
-    if not request.query or len(request.query.strip()) < 10:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Query must be at least 10 characters"
+            )
+        )
 
-        raise HTTPException(status_code=400, detail="Query must be at least 10 characters")
 
+    if request.database_type not in [
+        "postgres",
+        "mysql",
+        "bigquery"
+    ]:
 
-
-    if request.database_type not in ["postgres", "mysql", "bigquery"]:
-
-        raise HTTPException(status_code=400, detail="Unsupported database type")
-
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported database type"
+        )
 
 
     try:
 
-        optimization = analyze_query_with_groq(
+        # ====================================================================
+        # GENERATE CACHE KEY
+        # ====================================================================
+
+        cache_key = generate_cache_key(
 
             request.query,
 
@@ -355,167 +487,422 @@ async def optimize_query(request: OptimizeQueryRequest):
         )
 
 
+        optimization = None
+
+        cache_hit = False
+
+
+        # ====================================================================
+        # CHECK REDIS
+        # ====================================================================
+
+        if redis_client:
+
+            try:
+
+                cached_result = redis_client.get(
+                    cache_key
+                )
+
+                if cached_result:
+
+                    optimization = json.loads(
+                        cached_result
+                    )
+
+                    cache_hit = True
+
+                    print(
+                        " Redis Cache HIT"
+                    )
+
+                else:
+
+                    print(
+                        " Redis Cache MISS"
+                    )
+
+            except Exception as e:
+
+                print(
+                    f" Redis read error: {e}"
+                )
+
+
+        # ====================================================================
+        # CALL GROQ IF CACHE MISS
+        # ====================================================================
+
+        if optimization is None:
+
+            optimization = (
+                analyze_query_with_groq(
+
+                    request.query,
+
+                    request.database_type,
+
+                    request.context
+
+                )
+            )
+
+
+            # ================================================================
+            # SAVE RESULT TO REDIS
+            # ================================================================
+
+            if redis_client:
+
+                try:
+
+                    redis_client.setex(
+
+                        cache_key,
+
+                        21600, #6 hours
+
+                        json.dumps(
+                            optimization
+                        )
+
+                    )
+
+                    print(
+                        " Result stored in Redis"
+                    )
+
+                except Exception as e:
+
+                    print(
+                        f" Redis write error: {e}"
+                    )
+
+
+        # ====================================================================
+        # SAVE QUERY HISTORY
+        # ====================================================================
 
         db = SessionLocal()
 
-        history_record = QueryHistory(
+        try:
 
-            original_query=request.query,
+            history_record = QueryHistory(
 
-            optimized_query=optimization.get("optimized_query", ""),
+                original_query=request.query,
 
-            database_type=request.database_type,
+                optimized_query=optimization.get(
+                    "optimized_query",
+                    ""
+                ),
 
-            optimization_tips=json.dumps(optimization.get("optimization_tips", [])),
+                database_type=request.database_type,
 
-            estimated_improvement=optimization.get("estimated_improvement", ""),
+                optimization_tips=json.dumps(
+                    optimization.get(
+                        "optimization_tips",
+                        []
+                    )
+                ),
 
-        )
+                estimated_improvement=(
+                    optimization.get(
+                        "estimated_improvement",
+                        ""
+                    )
+                ),
 
-        db.add(history_record)
+            )
 
-        db.commit()
+            db.add(history_record)
 
-        db.close()
+            db.commit()
+
+        finally:
+
+            db.close()
 
 
+        # ====================================================================
+        # RETURN RESPONSE
+        # ====================================================================
 
         return OptimizationResponse(
 
             original_query=request.query,
 
-            optimized_query=optimization.get("optimized_query", ""),
+            optimized_query=optimization.get(
+                "optimized_query",
+                ""
+            ),
 
-            tips=optimization.get("optimization_tips", []),
+            tips=optimization.get(
+                "optimization_tips",
+                []
+            ),
 
-            estimated_improvement=optimization.get("estimated_improvement", ""),
+            estimated_improvement=(
+                optimization.get(
+                    "estimated_improvement",
+                    ""
+                )
+            ),
 
-            explanation=optimization.get("explanation", "")
+            explanation=optimization.get(
+                "explanation",
+                ""
+            ),
+
+            cached=cache_hit
 
         )
+
 
     except HTTPException:
 
         raise
 
+
     except Exception as e:
 
-        raise HTTPException(status_code=500, detail=f"Optimization failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Optimization failed: {str(e)}"
+            )
+        )
 
 
 
 # ============================================================================
-
-#  ENDPOINT 5: GET /history
-
+# ENDPOINT 5: GET /history
 # ============================================================================
 
 @app.get("/history")
+async def get_history(
+        limit: int = 20
+):
 
-async def get_history(limit: int = 20):
+    """
+    Get query history directly from database.
 
-    """Get query history"""
+    Redis is NOT used here.
+    """
 
     try:
 
         db = SessionLocal()
 
-        records = db.query(QueryHistory).order_by(QueryHistory.created_at.desc()).limit(limit).all()
+        try:
 
-        db.close()
+            records = (
 
-
-
-        return [
-
-            QueryHistoryResponse(
-
-                id=r.id,
-
-                original_query=r.original_query,
-
-                optimized_query=r.optimized_query,
-
-                database_type=r.database_type,
-
-                created_at=r.created_at,
-
-                estimated_improvement=r.estimated_improvement
+                db
+                .query(QueryHistory)
+                .order_by(
+                    QueryHistory.created_at.desc()
+                )
+                .limit(limit)
+                .all()
 
             )
 
-            for r in records
+            return [
 
-        ]
+                QueryHistoryResponse(
+
+                    id=r.id,
+
+                    original_query=r.original_query,
+
+                    optimized_query=r.optimized_query,
+
+                    database_type=r.database_type,
+
+                    created_at=r.created_at,
+
+                    estimated_improvement=(
+                        r.estimated_improvement
+                    )
+
+                )
+
+                for r in records
+
+            ]
+
+        finally:
+
+            db.close()
+
 
     except Exception as e:
 
-        raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Failed to fetch history: {str(e)}"
+            )
+        )
 
 
 
 # ============================================================================
-
-#  ENDPOINT 6: GET /stats
-
+# ENDPOINT 6: GET /stats
 # ============================================================================
 
 @app.get("/stats")
-
 async def get_stats():
 
-    """Get statistics"""
+    """
+    Get statistics directly from database.
+    """
 
     try:
 
         db = SessionLocal()
 
-        total = db.query(func.count(QueryHistory.id)).scalar() or 0
+        try:
 
-        db_types = db.query(
+            total = (
 
-            QueryHistory.database_type,
+                    db
+                    .query(
+                        func.count(
+                            QueryHistory.id
+                        )
+                    )
+                    .scalar()
 
-            func.count(QueryHistory.id).label("count")
+                    or 0
 
-        ).group_by(QueryHistory.database_type).all()
-
-        db.close()
+            )
 
 
+            db_types = (
+
+                db
+                .query(
+
+                    QueryHistory.database_type,
+
+                    func.count(
+                        QueryHistory.id
+                    ).label("count")
+
+                )
+
+                .group_by(
+                    QueryHistory.database_type
+                )
+
+                .all()
+
+            )
+
+
+            return {
+
+                "total_queries_analyzed": total,
+
+                "by_database_type": {
+
+                    db_type: count
+
+                    for db_type, count
+                    in db_types
+
+                }
+
+            }
+
+        finally:
+
+            db.close()
+
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Failed to fetch stats: {str(e)}"
+            )
+        )
+
+# ============================================================================
+# ENDPOINT 7: GET /cache/stats
+# ============================================================================
+
+@app.get("/cache/stats")
+async def get_cache_stats():
+
+    """
+    Get basic Redis cache information.
+    """
+
+    if not redis_client:
 
         return {
 
-            "total_queries_analyzed": total,
+            "redis": "not configured",
 
-            "by_database_type": {db_type: count for db_type, count in db_types}
+            "message": (
+                "Redis caching is disabled"
+            )
+
+        }
+
+
+    try:
+
+        info = redis_client.info()
+
+        return {
+
+            "redis": "connected",
+
+            "total_keys": redis_client.dbsize(),
+
+            "used_memory": info.get(
+                "used_memory_human",
+                "unknown"
+            ),
+
+            "connected_clients": info.get(
+                "connected_clients",
+                0
+            )
 
         }
 
     except Exception as e:
 
-        raise HTTPException(status_code=500, detail=f"Failed to fetch stats: {str(e)}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Redis error: {str(e)}"
+        )
 
 
-
-# START
+# ============================================================================
+# START SERVER
+# ============================================================================
 
 if __name__ == "__main__":
 
     import uvicorn
 
-    print(" API Docs: http://localhost:8000/docs")
-
-    print(" Health: http://localhost:8000/health")
-
-    print(" Optimize: POST http://localhost:8000/optimize")
-
-    print(" History: GET http://localhost:8000/history")
-
-    print(" Stats: GET http://localhost:8000/stats\n")
-
     uvicorn.run(
-    app,
-    host="0.0.0.0",
-    port=int(os.environ.get("PORT", 8001))
-)
+
+        app,
+
+        host="0.0.0.0",
+
+        port=int(
+            os.environ.get(
+                "PORT",
+                8000
+            )
+        )
+
+    )

@@ -8,6 +8,6 @@ export const environment = {
 
     production: false,
 
-    apiUrl: 'https://sql-query-optimizer-3.onrender.com'
+    apiUrl: 'http://localhost:8000'
 
 };

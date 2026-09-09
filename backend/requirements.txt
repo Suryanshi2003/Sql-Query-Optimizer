@@ -6,3 +6,4 @@ sqlalchemy==2.0.41
 pydantic==2.11.7
 python-multipart==0.0.20
 psycopg2-binary
+redis
